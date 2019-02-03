@@ -35,7 +35,7 @@ class CargoManager(StateMachine):
 
     @state(must_finish=True)
     def intaking_cargo(self):
-        if self.intake.contained():
+        if self.intake.is_contained():
             self.intake.stop()
             self.done()
         else:
@@ -58,6 +58,6 @@ class CargoManager(StateMachine):
         else:
             self.intake.outtake()
 
-        if not self.intake.contained():
+        if not self.intake.is_contained():
             self.intake.stop()
             self.done()
