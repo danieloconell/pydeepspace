@@ -111,9 +111,14 @@ class Robot(magicbot.MagicRobot):
         # cargo related objects
         self.intake_motor = ctre.TalonSRX(9)
         self.intake_switch = wpilib.DigitalInput(0)
+        self.arm_motor = ctre.TalonSRX(10)
+        self.arm_bottom_switch = wpilib.DigitalInput(6)
+        self.arm_top_switch = wpilib.DigitalInput(7)
+        self.arm_servo = wpilib.Servo(0)
 
         # boilerplate setup for the joystick
         self.joystick = wpilib.Joystick(0)
+        self.gamepad = wpilib.XboxController(1)
 
         self.spin_rate = 1.5
 
