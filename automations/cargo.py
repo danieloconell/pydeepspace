@@ -1,6 +1,11 @@
 from magicbot import StateMachine, state
 
+<<<<<<< HEAD
 from components.cargo import Arm, Intake
+=======
+from automations.alignment import Aligner
+from components.cargo import Arm, Height, Intake
+>>>>>>> Start intkaking once arm is at correct height
 
 
 class CargoManager(StateMachine):
@@ -17,21 +22,18 @@ class CargoManager(StateMachine):
 
     @state(first=True, must_finish=True)
     def move_to_floor(self):
-        self.next_state("intaking_cargo")
-
-    def intake_depot(self, force=False):
-        self.engage(initial_state="move_to_depot", force=force)
-
-    @state
-    def move_to_depot(self):
-        self.next_state("intaking_cargo")
+        self.arm.move_to(Height.FLOOR)
+        if self.arm.at_height():
+            self.next_state("intaking_cargo")
 
     def intake_loading(self, force=False):
         self.engage(initial_state="move_to_loading_station", force=force)
 
-    @state
+    @state(must_finish=True)
     def move_to_loading_station(self):
-        self.next_state("intaking_cargo")
+        self.arm.move_to(Height.LOADING_STATION)
+        if self.arm.at_height():
+            self.next_state("intaking_cargo")
 
     @state(must_finish=True)
     def intaking_cargo(self):
@@ -41,21 +43,12 @@ class CargoManager(StateMachine):
         else:
             self.intake.intake()
 
-    def start_outtake(self, force=False):
+    def outtake(self, force=False):
         self.engage(initial_state="outtaking_cargo", force=force)
 
     @state(must_finish=True)
     def outtaking_cargo(self, initial_call):
-        if not self.override:
-            # if initial_call:
-            #     self.align.align()
-            # if not self.align.is_executing:
-            #     if self.align.successful:
-            #         self.intake.outtake()
-            # else:
-            # self.done()
-            pass
-        else:
+        if initial_call:
             self.intake.outtake()
 
         if not self.intake.is_contained():
