@@ -1,5 +1,4 @@
 import enum
-import math
 
 import ctre
 import wpilib
@@ -32,8 +31,6 @@ class Intake:
 
 class Height(enum.Enum):
     FLOOR = 0
-    ROCKET_SHIP = 0.630
-    CARGO_SHIP = 0.880
     LOADING_STATION = 0.940
 
 
@@ -44,12 +41,7 @@ class Arm:
     bottom_switch: wpilib.DigitalInput
     top_switch: wpilib.DigitalInput
 
-    ARM_LENGTH = 42
-    FREE_SPEED = 42
-    COUNTS_PER_REV = 1024
-    COUNTS_PER_RADIAN = math.tau / COUNTS_PER_REV
-
-    def setup(self):
+    def setup(self) -> None:
         self.motor.setNeutralMode(ctre.NeutralMode.Brake)
         # Current limiting
         self.motor.configContinuousCurrentLimit(
@@ -64,54 +56,59 @@ class Arm:
             ctre.LimitSwitchNormal.NormallyOpen,
             timeoutMs=10,
         )
-        # self.motor.configForwardSoftLimitThreshold(
-        #     self.counts_per_meter(Height.LOADING_STATION.value), timeoutMs=10
-        # )
-        # self.motor.configForwardSoftLimitEnable(True, timeoutMs=10)
-        self.motor.configForwardSoftLimitEnable(True, 10)
         self.motor.configReverseLimitSwitchSource(
             ctre.LimitSwitchSource.FeedbackConnector,
             ctre.LimitSwitchNormal.NormallyOpen,
             timeoutMs=10,
         )
-        # self.motor.configReverseSoftLimitThreshold(
-        #     self.counts_per_meter(Height.FLOOR.value), timeoutMs=10
-        # )
-        # self.motor.configReverseSoftLimitEnable(True, timeoutMs=10)
-        self.motor.configReverseSoftLimitEnable(True, 10)
-        # Current height
+
+        # Arm starts at max height to remain within frame perimeter
         self.current_height = Height.LOADING_STATION
 
-    def counts_per_meter(self, meters: int):
-        angle = math.asin(meters / self.ARM_LENGTH)
-        return int(angle * self.COUNTS_PER_RADIAN)
+    def execute(self) -> None:
+        if self.at_height():
+            self.motor.set(ctre.ControlMode.PercentOutput, 0)
 
-    def execute(self):
-        pass
+    def at_height(self) -> bool:
+        # if self.current_height == Height.LOADING_STATION and hasattr(
+        #     self.motor.getFaults(), "forwardLimitSwitch"
+        # ):
+        #     return True
+        # elif self.current_height == Height.FLOOR and hasattr(
+        #     self.motor.getFaults(), "reverseLimitSwitch"
+        # ):
+        #     return True
+        # else:
+        #     return False
+        if self.current_height == Height.LOADING_STATION:
+            return self.motor.isFwdLimitSwitchClosed()
+        else:
+            return self.motor.isRevLimitSwitchClosed()
 
-    def move_to(self, height: Height):
+    def ratchet(self) -> None:
+        # this is hoping that this is half speed to the left
+        self.servo.set(0.25)
+
+    def unratchet(self) -> None:
+        # this is hoping that this is half speed to the right
+        self.servo.set(0.75)
+
+    def stop_ratchet(self) -> None:
+        self.servo.set(0)
+
+    def move_to(self, height: Height) -> None:
+        """Move arm to specified height.
+
+        Only support two heights (Floor, Loading Station), due to
+        only having limit switches and hard stops to find the position
+        of the arm.
+
+        Args:
+            height (Height): Height to move arm to
+        """
         if height == Height.FLOOR and self.current_height != height:
             self.motor.set(ctre.ControlMode.PercentOutput, -1)
             self.current_height = height
         elif height == Height.LOADING_STATION and self.current_height != height:
             self.motor.set(ctre.ControlMode.PercentOutput, 1)
             self.current_height = height
-        # self.motor.set(ctre.ControlMode.Position, self.counts_per_meter(height.value))
-
-    # def lift(self):
-    #     if self.current_height != Height.LOADING_STATION:
-    #         if self.current_height == Height.CARGO_SHIP:
-    #             self.move_to(Height.LOADING_STATION)
-    #         elif self.current_height == Height.ROCKET_SHIP:
-    #             self.move_to(Height.CARGO_SHIP)
-    #         elif self.current_height == Height.FLOOR:
-    #             self.move_to(Height.CARGO_SHIP)
-
-    # def lower(self):
-    #     if self.current_height != Height.FLOOR:
-    #         if self.current_height == Height.LOADING_STATION:
-    #             self.move_to(Height.CARGO_SHIP)
-    #         elif self.current_height == Height.CARGO_SHIP:
-    #             self.move_to(Height.ROCKET_SHIP)
-    #         elif self.current_height == Height.ROCKET_SHIP:
-    #             self.move_to(Height.FLOOR)

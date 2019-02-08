@@ -13,6 +13,8 @@ class CargoManager(StateMachine):
     arm: Arm
     intake: Intake
 
+    RATCH_TIME = 0.5
+
     def __init__(self):
         super().__init__()
         self.override = False
@@ -21,19 +23,27 @@ class CargoManager(StateMachine):
         self.engage(initial_state="move_to_floor", force=force)
 
     @state(first=True, must_finish=True)
-    def move_to_floor(self):
-        self.arm.move_to(Height.FLOOR)
-        if self.arm.at_height():
-            self.next_state("intaking_cargo")
+    def move_to_floor(self, initial_call, state_tm):
+        if initial_call:
+            self.arm.ratchet()
+        elif state_tm > self.RATCH_TIME:
+            self.arm.stop_ratchet()
+            self.arm.move_to(Height.FLOOR)
+            if self.arm.at_height():
+                self.next_state("intaking_cargo")
 
     def intake_loading(self, force=False):
         self.engage(initial_state="move_to_loading_station", force=force)
 
     @state(must_finish=True)
-    def move_to_loading_station(self):
-        self.arm.move_to(Height.LOADING_STATION)
-        if self.arm.at_height():
-            self.next_state("intaking_cargo")
+    def move_to_loading_station(self, initial_call, state_tm):
+        if initial_call:
+            self.arm.unratchet()
+        elif state_tm > self.RATCH_TIME:
+            self.arm.stop_ratchet()
+            self.arm.move_to(Height.LOADING_STATION)
+            if self.arm.at_height():
+                self.next_state("intaking_cargo")
 
     @state(must_finish=True)
     def intaking_cargo(self):
