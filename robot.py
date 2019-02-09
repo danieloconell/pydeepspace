@@ -14,7 +14,7 @@ from automations.alignment import (
     CargoDepositAligner,
 )
 from automations.cargo import CargoManager
-from components.cargo import Arm, Intake
+from components.cargo import Arm, CargoIntake
 from components.hatch import Hatch
 from automations.climb import ClimbAutomation
 from components.vision import Vision
@@ -59,7 +59,7 @@ class Robot(magicbot.MagicRobot):
     arm: Arm
     chassis: SwerveChassis
     hatch: Hatch
-    intake: Intake
+    intake: CargoIntake
 
     climber: Climber
 
