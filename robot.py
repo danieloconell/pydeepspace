@@ -89,7 +89,6 @@ class Robot(magicbot.MagicRobot):
             y_pos=-y_dist,
         )
         self.imu = NavX()
-        self.vision = Vision()
 
         self.sd = NetworkTables.getTable("SmartDashboard")
         wpilib.SmartDashboard.putData("Gyro", self.imu.ahrs)
@@ -122,6 +121,7 @@ class Robot(magicbot.MagicRobot):
     def disabledPeriodic(self):
         self.chassis.set_inputs(0, 0, 0)
         self.imu.resetHeading()
+        self.vision.execute()  # Keep the time offset calcs running
 
     def teleopInit(self):
         """Initialise driver control."""
@@ -297,6 +297,8 @@ class Robot(magicbot.MagicRobot):
         if self.joystick.getRawButton(11):
             for module in self.chassis.modules:
                 module.drive_motor.set(ctre.ControlMode.PercentOutput, 0.3)
+
+        self.vision.execute()  # Keep the time offset calcs running
 
 
 if __name__ == "__main__":
