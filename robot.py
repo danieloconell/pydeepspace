@@ -48,6 +48,8 @@ class Robot(magicbot.MagicRobot):
     back_lift: Lift
     lift_drive: LiftDrive
 
+    vision: Vision
+
     offset_rotation_rate = 20
 
     def createObjects(self):
