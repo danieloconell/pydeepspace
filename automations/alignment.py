@@ -56,7 +56,7 @@ class Aligner(StateMachine):
             self.last_vision = state_tm
             fiducial_x, fiducial_y, delta_heading = self.vision.get_fiducial_position()
             # Aim for a point in front of the fiducial
-            fiducial_x = fiducial_x / 2
+            fiducial_x = fiducial_x / 3
             norm = math.hypot(fiducial_x, fiducial_y)
             vx = self.alignment_speed * fiducial_x / norm
             vy = self.alignment_speed * fiducial_y / norm
@@ -73,8 +73,9 @@ class HatchDepositAligner(Aligner):
     hatch: Hatch
 
     @state(must_finish=True)
-    def success(self, state_tm):
-        self.hatch.punch()
+    def success(self, state_tm, initial_call):
+        if initial_call:
+            self.hatch.punch()
         if state_tm > 1:
             self.done()
 
