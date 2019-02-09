@@ -4,7 +4,7 @@ import ctre
 import wpilib
 
 
-class Intake:
+class CargoIntake:
 
     motor: ctre.TalonSRX
     intake_switch: wpilib.DigitalInput
@@ -34,6 +34,12 @@ class Height(enum.Enum):
     LOADING_STATION = 0.940
 
 
+class Ratchet(enum.Enum):
+    STOPPED = 0
+    RATCHETING = 1
+    UNRATCHETING = 2
+
+
 class Arm:
 
     motor: ctre.TalonSRX
@@ -49,7 +55,7 @@ class Arm:
         )  # TODO: change current limiting values to be more appropriate value
         self.motor.configPeakCurrentLimit(20, 10)
         self.motor.configPeakCurrentDuration(2, 10)
-        # Limit swtiches
+        # Limit switches
         self.motor.overrideLimitSwitchesEnable(False)
         self.motor.configForwardLimitSwitchSource(
             ctre.LimitSwitchSource.FeedbackConnector,
@@ -64,37 +70,43 @@ class Arm:
 
         # Arm starts at max height to remain within frame perimeter
         self.current_height = Height.LOADING_STATION
+        self.servo_state = Ratchet.STOPPED
 
     def execute(self) -> None:
         if self.at_height():
             self.motor.set(ctre.ControlMode.PercentOutput, 0)
 
     def at_height(self) -> bool:
-        # if self.current_height == Height.LOADING_STATION and hasattr(
-        #     self.motor.getFaults(), "forwardLimitSwitch"
-        # ):
-        #     return True
-        # elif self.current_height == Height.FLOOR and hasattr(
-        #     self.motor.getFaults(), "reverseLimitSwitch"
-        # ):
-        #     return True
-        # else:
-        #     return False
-        if self.current_height == Height.LOADING_STATION:
-            return self.motor.isFwdLimitSwitchClosed()
+        if self.current_height == Height.LOADING_STATION and hasattr(
+            self.motor.getFaults(), "forwardLimitSwitch"
+        ):
+            return True
+        elif self.current_height == Height.FLOOR and hasattr(
+            self.motor.getFaults(), "reverseLimitSwitch"
+        ):
+            return True
         else:
-            return self.motor.isRevLimitSwitchClosed()
+            return False
+        # if self.current_height == Height.LOADING_STATION:
+        #     return self.motor.isFwdLimitSwitchClosed()
+        # else:
+        #     return self.motor.isRevLimitSwitchClosed()
 
     def ratchet(self) -> None:
         # this is hoping that this is half speed to the left
-        self.servo.set(0.25)
+        if self.servo_state != Ratchet.RATCHETING:
+            self.servo.set(0.25)
+            self.servo_state = Ratchet.RATCHETING
 
     def unratchet(self) -> None:
         # this is hoping that this is half speed to the right
-        self.servo.set(0.75)
+        if self.servo_state != Ratchet.UNRATCHETING:
+            self.servo.set(0.75)
+            self.servo_state = Ratchet.UNRATCHETING
 
     def stop_ratchet(self) -> None:
         self.servo.set(0)
+        self.servo_state = Ratchet.STOPPED
 
     def move_to(self, height: Height) -> None:
         """Move arm to specified height.

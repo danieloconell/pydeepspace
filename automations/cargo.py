@@ -1,19 +1,14 @@
 from magicbot import StateMachine, state
 
-<<<<<<< HEAD
-from components.cargo import Arm, Intake
-=======
-from automations.alignment import Aligner
-from components.cargo import Arm, Height, Intake
->>>>>>> Start intkaking once arm is at correct height
+from components.cargo import Arm, CargoIntake, Height
 
 
 class CargoManager(StateMachine):
 
     arm: Arm
-    intake: Intake
+    intake: CargoIntake
 
-    RATCH_TIME = 0.5
+    RATCH_TIME = 0.1
 
     def __init__(self):
         super().__init__()
