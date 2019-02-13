@@ -3,7 +3,7 @@ import math
 
 import ctre
 
-# import rev
+import rev
 import magicbot
 import wpilib
 from networktables import NetworkTables
@@ -109,11 +109,9 @@ class Robot(magicbot.MagicRobot):
         self.lift_drive_motor = ctre.TalonSRX(20)
 
         # cargo related objects
-        self.intake_motor = ctre.TalonSRX(9)
+        self.intake_motor = ctre.VictorSPX(9)
         self.intake_switch = wpilib.DigitalInput(0)
-        self.arm_motor = ctre.TalonSRX(10)
-        self.arm_bottom_switch = wpilib.DigitalInput(6)
-        self.arm_top_switch = wpilib.DigitalInput(7)
+        self.arm_motor = rev.CANSparkMax(2)
         self.arm_servo = wpilib.Servo(0)
 
         # boilerplate setup for the joystick
@@ -168,7 +166,7 @@ class Robot(magicbot.MagicRobot):
             self.chassis.set_inputs(0, 0, 0)
 
         if joystick_hat != -1:
-            if self.intake.has_cargo:
+            if self.intake.is_contained():
                 constrained_angle = -constrain_angle(
                     math.radians(joystick_hat) + math.pi
                 )
@@ -182,7 +180,7 @@ class Robot(magicbot.MagicRobot):
         if self.joystick.getTrigger():
             if self.hatch.has_hatch:
                 self.hatch_deposit.engage()
-            elif self.intake.has_cargo:
+            elif self.intake.is_contained():
                 self.cargo_deposit.engage()
             else:
                 self.hatch_intake.engage()
@@ -195,6 +193,39 @@ class Robot(magicbot.MagicRobot):
                 self.chassis.heading_hold_off()
             else:
                 self.chassis.heading_hold_on()
+
+        if self.gamepad.getAButton():
+            self.arm.arm_down()
+        if self.gamepad.getBButton():
+            self.arm.arm_up()
+        if self.gamepad.getBButtonPressed():
+            self.cargo.intake_loading(force=True)
+
+        # if self.gamepad.getAButtonPressed():
+        #     self.cargo.engage(initial_state="intaking_cargo", force=True)
+        # if self.gamepad.getBButtonPressed():
+        #     self.cargo.outtake(force=True)
+
+        if self.gamepad.getXButtonPressed():
+            self.cargo.engage(initial_state="intaking_cargo", force=True)
+        if self.gamepad.getYButtonPressed():
+            self.cargo.outtake(force=True)
+        # if self.gamepad.getYButtonPressed():
+        #     self.arm.arm_down()
+
+        # if self.gamepad.getXButtonPressed():
+        #     self.cargo.outtake(force=True)
+        # if self.gamepad.getYButtonPressed():
+        #     self.arm.stop_ratchet()
+
+        if self.gamepad.getStartButtonPressed():
+            self.arm.ratchet()
+        if self.gamepad.getBackButtonPressed():
+            self.arm.unratchet()
+        if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
+            self.cargo.test_servo(force=True)
+        if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
+            self.cargo.test_servo(force=True)
 
     def robotPeriodic(self):
         super().robotPeriodic()
