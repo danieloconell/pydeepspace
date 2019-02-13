@@ -6,27 +6,33 @@ import wpilib
 
 class CargoIntake:
 
-    motor: ctre.TalonSRX
+    motor: ctre.VictorSPX
     intake_switch: wpilib.DigitalInput
 
-    def __init__(self):
-        self.motor_output = 0
-        self.has_cargo = False
+    INTAKE_SPEED = 1
+    OUTTAKE_SPEED = 0.75
 
-    def execute(self):
+    def __init__(self) -> None:
+        self.motor_output = 0
+
+    def setup(self):
+        wpilib.SmartDashboard.putData(self.intake_switch)
+
+    def execute(self) -> None:
+        wpilib.SmartDashboard.putBoolean("intake_switch", self.intake_switch.get())
         self.motor.set(ctre.ControlMode.PercentOutput, self.motor_output)
-        if not self.intake_switch.get():
-            self.has_cargo = True
 
-    def intake(self):
-        self.motor_output = -1
+    def intake(self) -> None:
+        self.motor_output = self.INTAKE_SPEED
 
-    def outtake(self):
-        self.motor_output = 1
-        self.has_cargo = False
+    def outtake(self) -> None:
+        self.motor_output = self.OUTTAKE_SPEED
 
-    def stop(self):
+    def stop(self) -> None:
         self.motor_output = 0
+
+    def is_contained(self) -> bool:
+        return self.intake_switch.get()
 
 
 class Height(enum.Enum):
@@ -34,27 +40,27 @@ class Height(enum.Enum):
     LOADING_STATION = 0.940
 
 
-class Ratchet(enum.Enum):
-    STOPPED = 0
-    RATCHETING = 1
-    UNRATCHETING = 2
-
-
 class Arm:
 
     motor: ctre.TalonSRX
     servo: wpilib.Servo
-    bottom_switch: wpilib.DigitalInput
-    top_switch: wpilib.DigitalInput
+
+    MOTOR_SPEED = 0.2
+    RATCHET_ANGLE = 0
+    UNRATCHET_ANGLE = 180
+
+    def __init__(self) -> None:
+        self.output = 0
 
     def setup(self) -> None:
         self.motor.setNeutralMode(ctre.NeutralMode.Brake)
         # Current limiting
         self.motor.configContinuousCurrentLimit(
-            20, 10
+            40, timeoutMs=10
         )  # TODO: change current limiting values to be more appropriate value
-        self.motor.configPeakCurrentLimit(20, 10)
-        self.motor.configPeakCurrentDuration(2, 10)
+        self.motor.configPeakCurrentLimit(50, timeoutMs=10)
+        self.motor.configPeakCurrentDuration(500, timeoutMs=10)
+        self.motor.enableCurrentLimit(True)
         # Limit switches
         self.motor.overrideLimitSwitchesEnable(False)
         self.motor.configForwardLimitSwitchSource(
@@ -67,46 +73,38 @@ class Arm:
             ctre.LimitSwitchNormal.NormallyOpen,
             timeoutMs=10,
         )
+        self.motor.setInverted(True)
 
         # Arm starts at max height to remain within frame perimeter
-        self.current_height = Height.LOADING_STATION
-        self.servo_state = Ratchet.STOPPED
+        self.current_height = Height.FLOOR
 
     def execute(self) -> None:
-        if self.at_height():
-            self.motor.set(ctre.ControlMode.PercentOutput, 0)
+        self.motor.set(ctre.ControlMode.PercentOutput, self.output)
+        wpilib.SmartDashboard.putBoolean("top_switch", self.motor.isFwdLimitSwitchClosed())
+        wpilib.SmartDashboard.putBoolean("bottom_switch", self.motor.isRevLimitSwitchClosed())
+
+        self.output = 0
 
     def at_height(self) -> bool:
-        if self.current_height == Height.LOADING_STATION and hasattr(
-            self.motor.getFaults(), "forwardLimitSwitch"
-        ):
+        if self.current_height == Height.LOADING_STATION and self.motor.getFaults().forwardLimitSwitch:
             return True
-        elif self.current_height == Height.FLOOR and hasattr(
-            self.motor.getFaults(), "reverseLimitSwitch"
-        ):
+        elif self.current_height == Height.FLOOR and self.motor.getFaults().reverseLimitSwitch:
             return True
         else:
             return False
+
         # if self.current_height == Height.LOADING_STATION:
         #     return self.motor.isFwdLimitSwitchClosed()
-        # else:
+        # if self.current_height == Height.FLOOR:
         #     return self.motor.isRevLimitSwitchClosed()
 
     def ratchet(self) -> None:
         # this is hoping that this is half speed to the left
-        if self.servo_state != Ratchet.RATCHETING:
-            self.servo.set(0.25)
-            self.servo_state = Ratchet.RATCHETING
+        self.servo.setAngle(self.RATCHET_ANGLE)
 
     def unratchet(self) -> None:
         # this is hoping that this is half speed to the right
-        if self.servo_state != Ratchet.UNRATCHETING:
-            self.servo.set(0.75)
-            self.servo_state = Ratchet.UNRATCHETING
-
-    def stop_ratchet(self) -> None:
-        self.servo.set(0)
-        self.servo_state = Ratchet.STOPPED
+        self.servo.setAngle(self.UNRATCHET_ANGLE)
 
     def move_to(self, height: Height) -> None:
         """Move arm to specified height.
@@ -119,8 +117,14 @@ class Arm:
             height (Height): Height to move arm to
         """
         if height == Height.FLOOR and self.current_height != height:
-            self.motor.set(ctre.ControlMode.PercentOutput, -1)
+            self.motor.set(ctre.ControlMode.PercentOutput, -self.MOTOR_SPEED)
             self.current_height = height
         elif height == Height.LOADING_STATION and self.current_height != height:
-            self.motor.set(ctre.ControlMode.PercentOutput, 1)
+            self.motor.set(ctre.ControlMode.PercentOutput, self.MOTOR_SPEED)
             self.current_height = height
+
+    def arm_up(self) -> None:
+        self.output = 0.8
+
+    def arm_down(self) -> None:
+        self.output = -self.MOTOR_SPEED

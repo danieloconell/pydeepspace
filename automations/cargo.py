@@ -1,4 +1,4 @@
-from magicbot import StateMachine, state
+from magicbot import StateMachine, state, tunable
 
 from components.cargo import Arm, CargoIntake, Height
 
@@ -7,8 +7,6 @@ class CargoManager(StateMachine):
 
     arm: Arm
     intake: CargoIntake
-
-    RATCH_TIME = 0.1
 
     def __init__(self):
         super().__init__()
@@ -21,11 +19,10 @@ class CargoManager(StateMachine):
     def move_to_floor(self, initial_call, state_tm):
         if initial_call:
             self.arm.ratchet()
-        elif state_tm > self.RATCH_TIME:
-            self.arm.stop_ratchet()
-            self.arm.move_to(Height.FLOOR)
-            if self.arm.at_height():
-                self.next_state("intaking_cargo")
+        self.arm.move_to(Height.FLOOR)
+        if self.arm.at_height():
+            self.arm.unratchet()
+            self.next_state("intaking_cargo")
 
     def intake_loading(self, force=False):
         self.engage(initial_state="move_to_loading_station", force=force)
@@ -34,11 +31,10 @@ class CargoManager(StateMachine):
     def move_to_loading_station(self, initial_call, state_tm):
         if initial_call:
             self.arm.unratchet()
-        elif state_tm > self.RATCH_TIME:
-            self.arm.stop_ratchet()
-            self.arm.move_to(Height.LOADING_STATION)
-            if self.arm.at_height():
-                self.next_state("intaking_cargo")
+        self.arm.move_to(Height.LOADING_STATION)
+        if self.arm.at_height():
+            self.arm.ratchet()
+            self.next_state("intaking_cargo")
 
     @state(must_finish=True)
     def intaking_cargo(self):
