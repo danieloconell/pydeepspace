@@ -129,7 +129,7 @@ class Robot(magicbot.MagicRobot):
         # cargo related objects
         self.intake_motor = ctre.VictorSPX(9)
         self.intake_switch = wpilib.DigitalInput(0)
-        self.arm_motor = rev.CANSparkMax(2)
+        self.arm_motor = rev.CANSparkMax(2, rev.MotorType.kBrushless)
         self.arm_servo = wpilib.Servo(0)
 
         # boilerplate setup for the joystick
