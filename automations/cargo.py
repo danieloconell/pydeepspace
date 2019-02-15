@@ -1,4 +1,4 @@
-from magicbot import StateMachine, state, tunable
+from magicbot import StateMachine, state, tunable, timed_state
 
 from components.cargo import Arm, CargoIntake, Height
 
@@ -17,12 +17,11 @@ class CargoManager(StateMachine):
 
     @state(first=True, must_finish=True)
     def move_to_floor(self, initial_call, state_tm):
-        if initial_call:
-            self.arm.ratchet()
-        if self.release_pressure(Height.FLOOR.value):
+        if state_tm < 0.2:
+            self.release_pressure(Height.FLOOR.value)
+        else:
             self.arm.move_to(Height.FLOOR)
         if self.arm.at_height():
-            self.arm.unratchet()
             self.next_state("intaking_cargo")
 
     def intake_loading(self, force=False):
@@ -30,10 +29,7 @@ class CargoManager(StateMachine):
 
     @state(must_finish=True)
     def move_to_loading_station(self, initial_call, state_tm):
-        if initial_call:
-            self.arm.unratchet()
-        if self.release_pressure(Height.LOADING_STATION.value):
-            self.arm.move_to(Height.LOADING_STATION)
+        self.arm.move_to(Height.LOADING_STATION)
         if self.arm.at_height():
             self.arm.ratchet()
             self.next_state("intaking_cargo")
@@ -60,7 +56,5 @@ class CargoManager(StateMachine):
 
     def release_pressure(self, target: float) -> bool:
         if target < self.arm.encoder.getPosition():
-                self.arm.motor.set(-0.05)
-                return False
-        else:
-            return True
+            self.arm.move_to(Height.LOADING_STATION)
+            self.arm.unratchet()

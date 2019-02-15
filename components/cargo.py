@@ -24,6 +24,9 @@ class CargoIntake:
         wpilib.SmartDashboard.putBoolean("intake_switch", self.intake_switch.get())
         self.motor.set(ctre.ControlMode.PercentOutput, self.motor_output)
 
+    def on_disable(self):
+        self.motor.set(ctre.ControlMode.PercentOutput, 0)
+
     def intake(self) -> None:
         self.motor_output = self.INTAKE_SPEED
 
@@ -58,7 +61,7 @@ class Arm:
     FREE_SPEED = 5600
     GEAR_RATIO = 49*84/50
     COUNTS_PER_REV = 1
-    COUNTS_PER_RADIAN = math.tau / COUNTS_PER_REV
+    COUNTS_PER_RADIAN = 20 / math.radians(105)  # measured counts
 
     def setup(self) -> None:
         self.motor.setIdleMode(rev.IdleMode.kBrake)
@@ -67,34 +70,52 @@ class Arm:
 
         self.encoder = self.motor.getEncoder()
         self.pid_controller = self.motor.getPIDController()
-        self.pid_controller.setP(0.05)
-        self.pid_controller.setI(0)
-        self.pid_controller.setD(0)
+        # self.pid_controller.setP(0.1)
+        # self.pid_controller.setI(0)
+        # self.pid_controller.setD(0)
+
+        self.pid_controller.setP(0.1, 1)
+        self.pid_controller.setI(0, 1)
+        self.pid_controller.setD(0, 1)
+        self.pid_controller.setOutputRange(-1, 1)
 
         self.top_limit_switch = self.motor.getReverseLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
         self.bottom_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
 
         # Arm starts at max height to remain within frame perimeter
-        self.current_height = Height.FLOOR
+        self.setpoint = Height.LOADING_STATION
+        self.tolerance = 0
 
-        self.setpoint = None
+        self.ratchet_engaged = True
 
     def execute(self) -> None:
         wpilib.SmartDashboard.putBoolean("top_switch", self.top_limit_switch.get())
         wpilib.SmartDashboard.putBoolean("bottom_switch", self.bottom_limit_switch.get())
+        wpilib.SmartDashboard.putNumber("cargo_setpoint", self.setpoint.value)
+        wpilib.SmartDashboard.putNumber("cargo_setpoint_counts", self.counts_per_rad(self.setpoint.value))
+        # if self.setpoint.value > self.counts_per_rad(self.encoder.getPosition()):
+            # we are going up
+        self.pid_controller.setReference(int(self.counts_per_rad(self.setpoint.value)), rev.ControlType.kPosition, pidSlot=1)
+        # else:
+        #     self.pid_controller.setReference(self.counts_per_rad(self.setpoint.value), rev.ControlType.kPosition, pidSlot=0)
+        if self.ratchet_engaged:
+            self.servo.setAngle(self.RATCHET_ANGLE)
+        else:
+            self.servo.setAngle(self.UNRATCHET_ANGLE)
 
     def at_height(self) -> bool:
-        return self.current_height(self.current_height.value) < self.encoder.getPosition()
+        return False
+        return abs(self.counts_per_rad(self.setpoint.value) - self.encoder.getPosition()) <= self.tolerance
 
     def ratchet(self) -> None:
-        self.servo.setAngle(self.RATCHET_ANGLE)
+        self.ratchet_engaged = True
 
     def unratchet(self) -> None:
-        self.servo.setAngle(self.UNRATCHET_ANGLE)
+        self.ratchet_engaged = False
 
     @classmethod
     def counts_per_rad(cls, angle) -> float:
-        return angle * cls.COUNTS_PER_RADIAN * cls.GEAR_RATIO
+        return angle * cls.COUNTS_PER_RADIAN
 
     def move_to(self, height: Height) -> None:
         """Move arm to specified height.
@@ -102,7 +123,7 @@ class Arm:
         Args:
             height: Height to move arm to
         """
-        self.pid_controller.setReference(self.counts_per_rad(height.value), rev.ControlType.kPosition)
-    
+        self.setpoint = height
+
     def set_motor(self, speed: float) -> None:
         self.motor.set(speed)

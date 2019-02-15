@@ -241,10 +241,10 @@ class Robot(magicbot.MagicRobot):
         # if self.gamepad.getBButtonPressed():
         #     self.cargo.outtake(force=True)
 
-        if self.gamepad.getXButtonPressed():
-            self.cargo.engage(initial_state="intaking_cargo", force=True)
-        if self.gamepad.getYButtonPressed():
-            self.cargo.outtake(force=True)
+        # if self.gamepad.getXButtonPressed():
+        #     self.cargo.engage(initial_state="intaking_cargo", force=True)
+        # if self.gamepad.getYButtonPressed():
+        #     self.cargo.outtake(force=True)
         # if self.gamepad.getYButtonPressed():
         #     self.arm.arm_down()
 
@@ -253,10 +253,15 @@ class Robot(magicbot.MagicRobot):
         # if self.gamepad.getYButtonPressed():
         #     self.arm.stop_ratchet()
 
-        # if self.gamepad.getStartButtonPressed():
-        #     self.arm.ratchet()
-        # if self.gamepad.getBackButtonPressed():
-        #     self.arm.unratchet()
+        if self.gamepad.getStartButtonPressed():
+            self.arm.ratchet()
+        if self.gamepad.getBackButtonPressed():
+            self.arm.unratchet()
+        
+        if self.gamepad.getXButton():
+            self.arm.pid_controller.setReference(self.arm.counts_per_rad(0), rev.ControlType.kPosition, pidSlot=1)
+        if self.gamepad.getYButton():
+            self.arm.pid_controller.setReference(self.arm.counts_per_rad(math.radians(105)), rev.ControlType.kPosition, pidSlot=1)
         # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
         #     self.cargo.test_servo(force=True)
         # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
@@ -264,22 +269,23 @@ class Robot(magicbot.MagicRobot):
 
     def robotPeriodic(self):
         super().robotPeriodic()
-        for module in self.chassis.modules:
-            self.sd.putNumber(
-                module.name + "_pos_steer",
-                module.steer_motor.getSelectedSensorPosition(0),
-            )
-            self.sd.putNumber(
-                module.name + "_pos_drive",
-                module.drive_motor.getSelectedSensorPosition(0),
-            )
-            self.sd.putNumber(
-                module.name + "_drive_motor_reading",
-                module.drive_motor.getSelectedSensorVelocity(0)
-                * 10  # convert to seconds
-                / module.drive_counts_per_metre,
-            )
-        self.sd.putBoolean("heading_hold", self.chassis.hold_heading)
+        self.sd.putNumber("cargo_encoder", self.arm.encoder.getPosition())
+    #     for module in self.chassis.modules:
+    #         self.sd.putNumber(
+    #             module.name + "_pos_steer",
+    #             module.steer_motor.getSelectedSensorPosition(0),
+    #         )
+    #         self.sd.putNumber(
+    #             module.name + "_pos_drive",
+    #             module.drive_motor.getSelectedSensorPosition(0),
+    #         )
+    #         self.sd.putNumber(
+    #             module.name + "_drive_motor_reading",
+    #             module.drive_motor.getSelectedSensorVelocity(0)
+    #             * 10  # convert to seconds
+    #             / module.drive_counts_per_metre,
+    #         )
+    #     self.sd.putBoolean("heading_hold", self.chassis.hold_heading)
 
     def testPeriodic(self):
         self.vision.execute()  # Keep the time offset calcs running
