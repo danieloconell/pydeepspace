@@ -38,10 +38,13 @@ class CargoIntake:
 
 
 class Height(enum.Enum):
-    FLOOR = 0
-    ROCKET_SHIP = 0.630
-    CARGO_SHIP = 0.880
-    LOADING_STATION = 0.940
+    FLOOR = math.radians(105)
+    ROCKET_SHIP = math.radians(46)
+    # 0.630 TODO placeholde, fix
+    CARGO_SHIP = math.pi/4
+    # 0.880 TODO placeholder fix
+    LOADING_STATION = 0
+    # 0.940
 
 
 class Arm:
@@ -52,9 +55,9 @@ class Arm:
     RATCHET_ANGLE = 0
     UNRATCHET_ANGLE = 180
 
-    ARM_LENGTH = 0
     FREE_SPEED = 5600
-    COUNTS_PER_REV = 42
+    GEAR_RATIO = 49*84/50
+    COUNTS_PER_REV = 1
     COUNTS_PER_RADIAN = math.tau / COUNTS_PER_REV
 
     def setup(self) -> None:
@@ -64,17 +67,17 @@ class Arm:
 
         self.encoder = self.motor.getEncoder()
         self.pid_controller = self.motor.getPIDController()
-        self.pid_controller.setP(2)
+        self.pid_controller.setP(0.05)
         self.pid_controller.setI(0)
         self.pid_controller.setD(0)
 
-        self.top_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
-        self.top_limit_switch.enableLimitSwitch(True)
+        self.top_limit_switch = self.motor.getReverseLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
         self.bottom_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
-        self.top_limit_switch.enableLimitSwitch(True)
 
         # Arm starts at max height to remain within frame perimeter
         self.current_height = Height.FLOOR
+
+        self.setpoint = None
 
     def execute(self) -> None:
         wpilib.SmartDashboard.putBoolean("top_switch", self.top_limit_switch.get())
@@ -89,14 +92,17 @@ class Arm:
     def unratchet(self) -> None:
         self.servo.setAngle(self.UNRATCHET_ANGLE)
 
-    def counts_per_meter(self, meters: int):
-        angle = math.asin(meters / self.ARM_LENGTH)
-        return int(angle * self.COUNTS_PER_RADIAN)
+    @classmethod
+    def counts_per_rad(cls, angle) -> float:
+        return angle * cls.COUNTS_PER_RADIAN * cls.GEAR_RATIO
 
     def move_to(self, height: Height) -> None:
         """Move arm to specified height.
 
         Args:
-            height (Height): Height to move arm to
+            height: Height to move arm to
         """
-        self.pid_controller.setReference(self.counts_per_meter(height.value), rev.ControlType.kPosition)
+        self.pid_controller.setReference(self.counts_per_rad(height.value), rev.ControlType.kPosition)
+    
+    def set_motor(self, speed: float) -> None:
+        self.motor.set(speed)

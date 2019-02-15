@@ -19,7 +19,8 @@ class CargoManager(StateMachine):
     def move_to_floor(self, initial_call, state_tm):
         if initial_call:
             self.arm.ratchet()
-        self.arm.move_to(Height.FLOOR)
+        if self.release_pressure(Height.FLOOR.value):
+            self.arm.move_to(Height.FLOOR)
         if self.arm.at_height():
             self.arm.unratchet()
             self.next_state("intaking_cargo")
@@ -31,7 +32,8 @@ class CargoManager(StateMachine):
     def move_to_loading_station(self, initial_call, state_tm):
         if initial_call:
             self.arm.unratchet()
-        self.arm.move_to(Height.LOADING_STATION)
+        if self.release_pressure(Height.LOADING_STATION.value):
+            self.arm.move_to(Height.LOADING_STATION)
         if self.arm.at_height():
             self.arm.ratchet()
             self.next_state("intaking_cargo")
@@ -55,3 +57,10 @@ class CargoManager(StateMachine):
         if not self.intake.is_contained():
             self.intake.stop()
             self.done()
+
+    def release_pressure(self, target: float) -> bool:
+        if target < self.arm.encoder.getPosition():
+                self.arm.motor.set(-0.05)
+                return False
+        else:
+            return True
