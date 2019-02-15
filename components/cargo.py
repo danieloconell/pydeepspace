@@ -1,6 +1,8 @@
 import enum
 
 import ctre
+import math
+import rev
 import wpilib
 
 
@@ -37,94 +39,64 @@ class CargoIntake:
 
 class Height(enum.Enum):
     FLOOR = 0
+    ROCKET_SHIP = 0.630
+    CARGO_SHIP = 0.880
     LOADING_STATION = 0.940
 
 
 class Arm:
 
-    motor: ctre.TalonSRX
+    motor: rev.CANSparkMax
     servo: wpilib.Servo
 
-    MOTOR_SPEED = 0.2
     RATCHET_ANGLE = 0
     UNRATCHET_ANGLE = 180
 
-    def __init__(self) -> None:
-        self.output = 0
+    ARM_LENGTH = 0
+    FREE_SPEED = 5600
+    COUNTS_PER_REV = 42
+    COUNTS_PER_RADIAN = math.tau / COUNTS_PER_REV
 
     def setup(self) -> None:
-        self.motor.setNeutralMode(ctre.NeutralMode.Brake)
-        # Current limiting
-        self.motor.configContinuousCurrentLimit(
-            40, timeoutMs=10
-        )  # TODO: change current limiting values to be more appropriate value
-        self.motor.configPeakCurrentLimit(50, timeoutMs=10)
-        self.motor.configPeakCurrentDuration(500, timeoutMs=10)
-        self.motor.enableCurrentLimit(True)
-        # Limit switches
-        self.motor.overrideLimitSwitchesEnable(False)
-        self.motor.configForwardLimitSwitchSource(
-            ctre.LimitSwitchSource.FeedbackConnector,
-            ctre.LimitSwitchNormal.NormallyOpen,
-            timeoutMs=10,
-        )
-        self.motor.configReverseLimitSwitchSource(
-            ctre.LimitSwitchSource.FeedbackConnector,
-            ctre.LimitSwitchNormal.NormallyOpen,
-            timeoutMs=10,
-        )
-        self.motor.setInverted(True)
+        self.motor.setIdleMode(rev.IdleMode.kBrake)
+        self.motor.setSecondaryCurrentLimit(60, limitCycles=200)  # check limitCycles
+        self.motor.setInverted(False)
+
+        self.encoder = self.motor.getEncoder()
+        self.pid_controller = self.motor.getPIDController()
+        self.pid_controller.setP(2)
+        self.pid_controller.setI(0)
+        self.pid_controller.setD(0)
+
+        self.top_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
+        self.top_limit_switch.enableLimitSwitch(True)
+        self.bottom_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
+        self.top_limit_switch.enableLimitSwitch(True)
 
         # Arm starts at max height to remain within frame perimeter
         self.current_height = Height.FLOOR
 
     def execute(self) -> None:
-        self.motor.set(ctre.ControlMode.PercentOutput, self.output)
-        wpilib.SmartDashboard.putBoolean("top_switch", self.motor.isFwdLimitSwitchClosed())
-        wpilib.SmartDashboard.putBoolean("bottom_switch", self.motor.isRevLimitSwitchClosed())
-
-        self.output = 0
+        wpilib.SmartDashboard.putBoolean("top_switch", self.top_limit_switch.get())
+        wpilib.SmartDashboard.putBoolean("bottom_switch", self.bottom_limit_switch.get())
 
     def at_height(self) -> bool:
-        if self.current_height == Height.LOADING_STATION and self.motor.getFaults().forwardLimitSwitch:
-            return True
-        elif self.current_height == Height.FLOOR and self.motor.getFaults().reverseLimitSwitch:
-            return True
-        else:
-            return False
-
-        # if self.current_height == Height.LOADING_STATION:
-        #     return self.motor.isFwdLimitSwitchClosed()
-        # if self.current_height == Height.FLOOR:
-        #     return self.motor.isRevLimitSwitchClosed()
+        return self.current_height(self.current_height.value) < self.encoder.getPosition()
 
     def ratchet(self) -> None:
-        # this is hoping that this is half speed to the left
         self.servo.setAngle(self.RATCHET_ANGLE)
 
     def unratchet(self) -> None:
-        # this is hoping that this is half speed to the right
         self.servo.setAngle(self.UNRATCHET_ANGLE)
+
+    def counts_per_meter(self, meters: int):
+        angle = math.asin(meters / self.ARM_LENGTH)
+        return int(angle * self.COUNTS_PER_RADIAN)
 
     def move_to(self, height: Height) -> None:
         """Move arm to specified height.
 
-        Only support two heights (Floor, Loading Station), due to
-        only having limit switches and hard stops to find the position
-        of the arm.
-
         Args:
             height (Height): Height to move arm to
         """
-        if height == Height.FLOOR and self.current_height != height:
-            self.motor.set(ctre.ControlMode.PercentOutput, -self.MOTOR_SPEED)
-            self.current_height = height
-        elif height == Height.LOADING_STATION and self.current_height != height:
-            self.motor.set(ctre.ControlMode.PercentOutput, self.MOTOR_SPEED)
-            self.current_height = height
-
-    def arm_up(self) -> None:
-        self.output = 0.8
-
-    def arm_down(self) -> None:
-        self.output = -self.MOTOR_SPEED
+        self.pid_controller.setReference(self.counts_per_meter(height.value), rev.ControlType.kPosition)
