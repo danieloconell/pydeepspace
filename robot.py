@@ -230,9 +230,9 @@ class Robot(magicbot.MagicRobot):
                 self.chassis.heading_hold_on()
 
         if self.gamepad.getAButton():
-            self.arm.arm_down()
+            self.cargo.intake_floor()
         if self.gamepad.getBButton():
-            self.arm.arm_up()
+            self.cargo.intake_loading()
         if self.gamepad.getBButtonPressed():
             self.cargo.intake_loading(force=True)
 
@@ -253,14 +253,14 @@ class Robot(magicbot.MagicRobot):
         # if self.gamepad.getYButtonPressed():
         #     self.arm.stop_ratchet()
 
-        if self.gamepad.getStartButtonPressed():
-            self.arm.ratchet()
-        if self.gamepad.getBackButtonPressed():
-            self.arm.unratchet()
-        if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
-            self.cargo.test_servo(force=True)
-        if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
-            self.cargo.test_servo(force=True)
+        # if self.gamepad.getStartButtonPressed():
+        #     self.arm.ratchet()
+        # if self.gamepad.getBackButtonPressed():
+        #     self.arm.unratchet()
+        # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
+        #     self.cargo.test_servo(force=True)
+        # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
+        #     self.cargo.test_servo(force=True)
 
     def robotPeriodic(self):
         super().robotPeriodic()
