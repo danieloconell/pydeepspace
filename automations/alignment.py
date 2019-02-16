@@ -3,8 +3,8 @@ import math
 from magicbot import tunable
 from magicbot.state_machine import StateMachine, state
 
+from automations.cargo import CargoManager
 from components.hatch import Hatch
-from components.cargo import CargoIntake
 from components.vision import Vision
 from pyswervedrive.chassis import SwerveChassis
 
@@ -81,11 +81,11 @@ class HatchDepositAligner(Aligner):
 class CargoDepositAligner(Aligner):
 
     VERBOSE_LOGGING = True
-    intake: CargoIntake
+    cargo: CargoManager
 
     @state(must_finish=True)
     def success(self):
-        self.intake.deposit()
+        self.cargo.outtake()
         self.done()
 
 

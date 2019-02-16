@@ -4,40 +4,7 @@ import ctre
 import math
 import rev
 import wpilib
-
-
-class CargoIntake:
-
-    motor: ctre.VictorSPX
-    intake_switch: wpilib.DigitalInput
-
-    INTAKE_SPEED = 1
-    OUTTAKE_SPEED = 0.75
-
-    def __init__(self) -> None:
-        self.motor_output = 0
-
-    def setup(self):
-        wpilib.SmartDashboard.putData(self.intake_switch)
-
-    def execute(self) -> None:
-        wpilib.SmartDashboard.putBoolean("intake_switch", self.intake_switch.get())
-        self.motor.set(ctre.ControlMode.PercentOutput, self.motor_output)
-
-    def on_disable(self):
-        self.motor.set(ctre.ControlMode.PercentOutput, 0)
-
-    def intake(self) -> None:
-        self.motor_output = self.INTAKE_SPEED
-
-    def outtake(self) -> None:
-        self.motor_output = self.OUTTAKE_SPEED
-
-    def stop(self) -> None:
-        self.motor_output = 0
-
-    def is_contained(self) -> bool:
-        return self.intake_switch.get()
+import wpilib_controller
 
 
 class Height(enum.Enum):
@@ -49,53 +16,71 @@ class Height(enum.Enum):
     LOADING_STATION = 0
     # 0.940
 
+    @classmethod
+    def closest(cls, current_height):
+        return min(cls, key=lambda a: abs(a.value - current_height))
 
-class Arm:
 
-    motor: rev.CANSparkMax
+class CargoManipulator:
+
+    arm_motor: rev.CANSparkMax
+    intake_motor: ctre.VictorSPX
     servo: wpilib.Servo
+
+    intake_switch: wpilib.DigitalInput
 
     RATCHET_ANGLE = 0
     UNRATCHET_ANGLE = 180
 
     FREE_SPEED = 5600
     GEAR_RATIO = 49*84/50
+
     COUNTS_PER_REV = 1
     COUNTS_PER_RADIAN = 20 / math.radians(105)  # measured counts
 
+    INTAKE_SPEED = 1
+    OUTTAKE_SPEED = 0.75
+
+    def __init__(self):
+        self.intake_motor_output = 0
+
     def setup(self) -> None:
-        self.motor.setIdleMode(rev.IdleMode.kBrake)
-        self.motor.setSecondaryCurrentLimit(60, limitCycles=200)  # check limitCycles
-        self.motor.setInverted(False)
+        self.arm_motor.setIdleMode(rev.IdleMode.kBrake)
+        self.arm_motor.setSecondaryCurrentLimit(60, limitCycles=200)  # check limitCycles
+        self.arm_motor.setInverted(False)
 
-        self.encoder = self.motor.getEncoder()
-        self.pid_controller = self.motor.getPIDController()
-        # self.pid_controller.setP(0.1)
-        # self.pid_controller.setI(0)
-        # self.pid_controller.setD(0)
-
-        self.pid_controller.setP(0.1, 1)
-        self.pid_controller.setI(0, 1)
-        self.pid_controller.setD(0, 1)
+        self.encoder = self.arm_motor.getEncoder()
+        self.pid_controller = wpilib_controller.PIDController(Kp=0.1, Ki=0.0, Kd=0.0, measurement_source=self.encoder.getPosition, period=1/50)
+        self.pid_controller.setInputRange(Height.LOADING_STATION.value, Height.FLOOR.value)
         self.pid_controller.setOutputRange(-1, 1)
 
-        self.top_limit_switch = self.motor.getReverseLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
-        self.bottom_limit_switch = self.motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
+        self.top_limit_switch = self.arm_motor.getReverseLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
+        self.bottom_limit_switch = self.arm_motor.getForwardLimitSwitch(rev.LimitSwitchPolarity.kNormallyOpen)
 
         # Arm starts at max height to remain within frame perimeter
-        self.setpoint = Height.LOADING_STATION
+        self.setpoint = Height.LOADING_STATION.value
         self.tolerance = 0
 
         self.ratchet_engaged = True
 
+        self.has_cargo = False
+
+        wpilib.SmartDashboard.putData(self.intake_switch)
+
     def execute(self) -> None:
         wpilib.SmartDashboard.putBoolean("top_switch", self.top_limit_switch.get())
         wpilib.SmartDashboard.putBoolean("bottom_switch", self.bottom_limit_switch.get())
-        wpilib.SmartDashboard.putNumber("cargo_setpoint", self.setpoint.value)
-        wpilib.SmartDashboard.putNumber("cargo_setpoint_counts", self.counts_per_rad(self.setpoint.value))
+        wpilib.SmartDashboard.putNumber("cargo_setpoint", self.setpoint)
+        wpilib.SmartDashboard.putNumber("cargo_setpoint_counts", self.counts_per_rad(self.setpoint))
+        wpilib.SmartDashboard.putBoolean("intake_switch", self.intake_switch.get())
+
+        self.intake_motor.set(ctre.ControlMode.PercentOutput, self.intake_motor_output)
+
         # if self.setpoint.value > self.counts_per_rad(self.encoder.getPosition()):
-            # we are going up
-        self.pid_controller.setReference(int(self.counts_per_rad(self.setpoint.value)), rev.ControlType.kPosition, pidSlot=1)
+        # we are going up
+        self.pid_controller.setReference(self.setpoint)
+        output = self.pid_controller.update()
+        self.arm_motor.set(output)
         # else:
         #     self.pid_controller.setReference(self.counts_per_rad(self.setpoint.value), rev.ControlType.kPosition, pidSlot=0)
         if self.ratchet_engaged:
@@ -103,9 +88,11 @@ class Arm:
         else:
             self.servo.setAngle(self.UNRATCHET_ANGLE)
 
-    def at_height(self) -> bool:
-        return False
-        return abs(self.counts_per_rad(self.setpoint.value) - self.encoder.getPosition()) <= self.tolerance
+        if self.is_contained():
+            self.has_cargo = True
+
+    def at_height(self, desired_height) -> bool:
+        return abs(self.counts_per_rad(desired_height.value) - self.encoder.getPosition()) <= self.tolerance
 
     def ratchet(self) -> None:
         self.ratchet_engaged = True
@@ -123,7 +110,21 @@ class Arm:
         Args:
             height: Height to move arm to
         """
-        self.setpoint = height
+        self.setpoint = height.value
 
-    def set_motor(self, speed: float) -> None:
-        self.motor.set(speed)
+    def on_disable(self):
+        self.intake_motor.set(ctre.ControlMode.PercentOutput, 0)
+        self.arm_motor.set(0)
+
+    def intake(self) -> None:
+        self.intake_motor_output = self.INTAKE_SPEED
+
+    def outtake(self) -> None:
+        self.has_cargo = False
+        self.intake_motor_output = self.OUTTAKE_SPEED
+
+    def stop(self) -> None:
+        self.intake_motor_output = 0
+
+    def is_contained(self) -> bool:
+        return self.intake_switch.get()

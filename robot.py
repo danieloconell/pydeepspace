@@ -14,7 +14,7 @@ from automations.alignment import (
     CargoDepositAligner,
 )
 from automations.cargo import CargoManager
-from components.cargo import Arm, CargoIntake
+from components.cargo import CargoManipulator
 from components.hatch import Hatch
 from automations.climb import ClimbAutomation
 from components.vision import Vision
@@ -56,10 +56,9 @@ class Robot(magicbot.MagicRobot):
     hatch_intake: HatchIntakeAligner
 
     # Actuators
-    arm: Arm
+    cargo_component: CargoManipulator
     chassis: SwerveChassis
     hatch: Hatch
-    intake: CargoIntake
 
     climber: Climber
 
@@ -141,7 +140,7 @@ class Robot(magicbot.MagicRobot):
         self.intake_motor = ctre.VictorSPX(9)
         self.intake_switch = wpilib.DigitalInput(0)
         self.arm_motor = rev.CANSparkMax(2, rev.MotorType.kBrushless)
-        self.arm_servo = wpilib.Servo(0)
+        self.cargo_component_servo = wpilib.Servo(0)
 
         # boilerplate setup for the joystick
         self.joystick = wpilib.Joystick(0)
@@ -196,7 +195,7 @@ class Robot(magicbot.MagicRobot):
             self.chassis.set_inputs(0, 0, 0)
 
         if joystick_hat != -1:
-            if self.intake.is_contained():
+            if self.cargo_component.is_contained():
                 constrained_angle = -constrain_angle(
                     math.radians(joystick_hat) + math.pi
                 )
@@ -229,10 +228,8 @@ class Robot(magicbot.MagicRobot):
             else:
                 self.chassis.heading_hold_on()
 
-        if self.gamepad.getAButton():
-            self.cargo.intake_floor()
-        if self.gamepad.getBButton():
-            self.cargo.intake_loading()
+        if self.gamepad.getAButtonPressed():
+            self.cargo.intake_floor(force=True)
         if self.gamepad.getBButtonPressed():
             self.cargo.intake_loading(force=True)
 
@@ -246,30 +243,21 @@ class Robot(magicbot.MagicRobot):
         # if self.gamepad.getYButtonPressed():
         #     self.cargo.outtake(force=True)
         # if self.gamepad.getYButtonPressed():
-        #     self.arm.arm_down()
-
-        # if self.gamepad.getXButtonPressed():
-        #     self.cargo.outtake(force=True)
-        # if self.gamepad.getYButtonPressed():
-        #     self.arm.stop_ratchet()
+        #     self.cargo_component.cargo_component_down()
 
         if self.gamepad.getStartButtonPressed():
-            self.arm.ratchet()
+            self.cargo_component.ratchet()
         if self.gamepad.getBackButtonPressed():
-            self.arm.unratchet()
+            self.cargo_component.unratchet()
         
         if self.gamepad.getXButton():
-            self.arm.pid_controller.setReference(self.arm.counts_per_rad(0), rev.ControlType.kPosition, pidSlot=1)
+            self.cargo_component.pid_controller.setReference(self.cargo_component.counts_per_rad(0))
         if self.gamepad.getYButton():
-            self.arm.pid_controller.setReference(self.arm.counts_per_rad(math.radians(105)), rev.ControlType.kPosition, pidSlot=1)
-        # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
-        #     self.cargo.test_servo(force=True)
-        # if self.gamepad.getBumperPressed(self.gamepad.Hand.kRight):
-        #     self.cargo.test_servo(force=True)
+            self.cargo_component.pid_controller.setReference(self.cargo_component.counts_per_rad(math.radians(105)))
 
     def robotPeriodic(self):
         super().robotPeriodic()
-        self.sd.putNumber("cargo_encoder", self.arm.encoder.getPosition())
+        self.sd.putNumber("cargo_encoder", self.cargo_component.encoder.getPosition())
     #     for module in self.chassis.modules:
     #         self.sd.putNumber(
     #             module.name + "_pos_steer",
