@@ -261,13 +261,9 @@ class Robot(magicbot.MagicRobot):
             self.cargo_component.unratchet()
 
         if self.gamepad.getXButton():
-            self.cargo_component.pid_controller.setReference(
-                self.cargo_component.arm_motor.set(-0.5)
-            )
+            self.cargo_component.arm_motor.set(-0.5)
         if self.gamepad.getYButton():
-            self.cargo_component.pid_controller.setReference(
-                self.cargo_component.arm_motor.set(0.5)
-            )
+            self.cargo_component.arm_motor.set(0.5)
 
     def robotPeriodic(self):
         super().robotPeriodic()
