@@ -19,6 +19,7 @@ class Aligner(StateMachine):
     """
 
     VERBOSE_LOGGING = True
+    SIDE = 1  # The side the hatch is on
 
     chassis: SwerveChassis
     vision: Vision
@@ -56,8 +57,8 @@ class Aligner(StateMachine):
             # Aim for a point in front of the fiducial
             fiducial_x = fiducial_x / 3
             norm = math.hypot(fiducial_x, fiducial_y)
-            vx = self.alignment_speed * fiducial_x / norm
-            vy = self.alignment_speed * fiducial_y / norm
+            vx = self.alignment_speed * fiducial_x / norm * self.SIDE
+            vy = self.alignment_speed * fiducial_y / norm * self.SIDE
             self.chassis.set_inputs(vx, vy, 0, field_oriented=False)
 
     @state(must_finish=True)
@@ -82,6 +83,8 @@ class CargoDepositAligner(Aligner):
 
     VERBOSE_LOGGING = True
     cargo: CargoManager
+    SIDE = -1  # The side the cargo is on
+    # Flip our axis because we are using a camera in a different location
 
     @state(must_finish=True)
     def success(self):
@@ -93,7 +96,7 @@ class HatchIntakeAligner(Aligner):
 
     VERBOSE_LOGGING = True
     hatch: Hatch
-    # TODO delete this once limit switches are working
+    # TODO delete this once switches are working
 
     @state(must_finish=True)
     def success(self):

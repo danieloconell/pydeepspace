@@ -1,11 +1,13 @@
 from magicbot import StateMachine, state, tunable, timed_state
 
 from components.cargo import CargoManipulator, Height
+from components.vision import Vision
 
 
 class CargoManager(StateMachine):
 
     cargo_component: CargoManipulator
+    vision: Vision
 
     def __init__(self):
         super().__init__()
@@ -23,6 +25,30 @@ class CargoManager(StateMachine):
         if self.cargo_component.at_height(Height.FLOOR):
             self.next_state("intaking_cargo")
 
+    @state(must_finish=True)
+    def move_to_rocket(self, initial_call, state_tm):
+        if state_tm < 0.2:
+            self.release_pressure(Height.ROCKET_SHIP.value)
+        else:
+            self.cargo_component.move_to(Height.ROCKET_SHIP)
+        if self.cargo_component.at_height(Height.ROCKET_SHIP):
+            self.next_state("outaking_cargo")
+
+    @state(must_finish=True)
+    def move_to_cargo_ship(self, initial_call, state_tm):
+        if state_tm < 0.2:
+            self.release_pressure(Height.CARGO_SHIP.value)
+        else:
+            self.cargo_component.move_to(Height.CARGO_SHIP)
+        if self.cargo_component.at_height(Height.CARGO_SHIP):
+            self.next_state("outaking_cargo")
+
+    def outake_cargo_ship(self, force=False):
+        self.engage(initial_state="move_to_cargo_ship", force=force)
+
+    def outake_rocket(self, force=False):
+        self.engage(initial_state="move_to_rocket", force=force)
+
     def intake_loading(self, force=False):
         self.engage(initial_state="move_to_loading_station", force=force)
 
@@ -39,6 +65,7 @@ class CargoManager(StateMachine):
             self.cargo_component.stop()
             self.done()
         else:
+            self.vision.mode = Vision.CARGO_MODE
             self.cargo_component.intake()
 
     def outtake(self, force=False):

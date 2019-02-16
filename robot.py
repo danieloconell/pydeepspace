@@ -85,31 +85,31 @@ class Robot(magicbot.MagicRobot):
         y_dist = 0.2165
         self.module_a = SwerveModule(  # front right module
             "a",
-            steer_talon=ctre.TalonSRX(7),
-            drive_talon=ctre.TalonSRX(8),
+            steer_talon=ctre.TalonSRX(3),
+            drive_talon=ctre.TalonSRX(4),
             x_pos=x_dist,
             y_pos=y_dist,
+            reverse_drive_encoder=True,
+            reverse_drive_direction=True,
         )
         self.module_b = SwerveModule(  # top left module
             "b",
-            steer_talon=ctre.TalonSRX(1),
-            drive_talon=ctre.TalonSRX(2),
+            steer_talon=ctre.TalonSRX(5),
+            drive_talon=ctre.TalonSRX(6),
             x_pos=-x_dist,
             y_pos=y_dist,
         )
         self.module_c = SwerveModule(  # bottom left module
             "c",
-            steer_talon=ctre.TalonSRX(3),
-            drive_talon=ctre.TalonSRX(4),
+            steer_talon=ctre.TalonSRX(1),
+            drive_talon=ctre.TalonSRX(2),
             x_pos=-x_dist,
             y_pos=-y_dist,
-            reverse_drive_direction=False,
-            reverse_drive_encoder=True,
         )
         self.module_d = SwerveModule(  # bottom right module
             "d",
-            steer_talon=ctre.TalonSRX(5),
-            drive_talon=ctre.TalonSRX(6),
+            steer_talon=ctre.TalonSRX(7),
+            drive_talon=ctre.TalonSRX(8),
             x_pos=x_dist,
             y_pos=-y_dist,
         )
@@ -140,7 +140,7 @@ class Robot(magicbot.MagicRobot):
         self.intake_motor = ctre.VictorSPX(9)
         self.intake_switch = wpilib.DigitalInput(0)
         self.arm_motor = rev.CANSparkMax(2, rev.MotorType.kBrushless)
-        self.cargo_component_servo = wpilib.Servo(0)
+        self.intake_servo = wpilib.Servo(0)
 
         # boilerplate setup for the joystick
         self.joystick = wpilib.Joystick(0)
@@ -228,6 +228,16 @@ class Robot(magicbot.MagicRobot):
             else:
                 self.chassis.heading_hold_on()
 
+        # if self.gamepad.getY(self.gamepad.Hand.kLeft) > 0.2:
+
+        # if self.gamepad.getY(self.gamepad.Hand.kLeft) < -0.2:
+
+        if self.gamepad.getTriggerAxis(self.gamepad.Hand.kLeft) > 0.1:
+            self.cargo.outake_cargo_ship(force=True)
+
+        if self.gamepad.getTriggerAxis(self.gamepad.Hand.kRight) > 0.1:
+            self.cargo.outake_rocket(force=True)
+
         if self.gamepad.getAButtonPressed():
             self.cargo.intake_floor(force=True)
         if self.gamepad.getBButtonPressed():
@@ -249,15 +259,20 @@ class Robot(magicbot.MagicRobot):
             self.cargo_component.ratchet()
         if self.gamepad.getBackButtonPressed():
             self.cargo_component.unratchet()
-        
+
         if self.gamepad.getXButton():
-            self.cargo_component.pid_controller.setReference(self.cargo_component.counts_per_rad(0))
+            self.cargo_component.pid_controller.setReference(
+                self.cargo_component.counts_per_rad(0)
+            )
         if self.gamepad.getYButton():
-            self.cargo_component.pid_controller.setReference(self.cargo_component.counts_per_rad(math.radians(105)))
+            self.cargo_component.pid_controller.setReference(
+                self.cargo_component.counts_per_rad(math.radians(105))
+            )
 
     def robotPeriodic(self):
         super().robotPeriodic()
         self.sd.putNumber("cargo_encoder", self.cargo_component.encoder.getPosition())
+
     #     for module in self.chassis.modules:
     #         self.sd.putNumber(
     #             module.name + "_pos_steer",

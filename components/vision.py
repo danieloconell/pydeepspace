@@ -13,6 +13,10 @@ class Vision:
 
     chassis: SwerveChassis
 
+    CARGO_ROCKET_MODE = 1
+    CARGO_MODE = 2
+    HATCH_MODE = 0
+
     fiducial_x = ntproperty("/vision/fiducial_x", 0.0, writeDefault=False)
     fiducial_y = ntproperty("/vision/fiducial_y", 0.0, writeDefault=False)
     fiducial_time = ntproperty("/vision/fiducial_time", -1.0, writeDefault=False)
@@ -21,6 +25,7 @@ class Vision:
     rio_pong_time = ntproperty("/vision/rio_pong", 0.0, writeDefault=False)
     latency = ntproperty("/vision/clock_offset", 0.0)
     processing_time = ntproperty("/vision/processing_time", 0.0)
+    mode = ntproperty("/vision/mode", HATCH_MODE)
     # NOTE: x and y are relative to the robot co-ordinate system, not the camera
 
     def __init__(self):
