@@ -262,11 +262,11 @@ class Robot(magicbot.MagicRobot):
 
         if self.gamepad.getXButton():
             self.cargo_component.pid_controller.setReference(
-                self.cargo_component.counts_per_rad(0)
+                self.cargo_component.arm_motor.set(-0.5)
             )
         if self.gamepad.getYButton():
             self.cargo_component.pid_controller.setReference(
-                self.cargo_component.counts_per_rad(math.radians(105))
+                self.cargo_component.arm_motor.set(0.5)
             )
 
     def robotPeriodic(self):
