@@ -1,8 +1,7 @@
 import enum
+import math
 
 import ctre
-import math
-import networktables
 import rev
 import wpilib
 import wpilib_controller
@@ -30,8 +29,8 @@ class CargoManipulator:
 
     intake_switch: wpilib.DigitalInput
 
-    RATCHET_ANGLE = 180
-    UNRATCHET_ANGLE = 0
+    RATCHET_ANGLE = 0
+    UNRATCHET_ANGLE = 90
 
     FREE_SPEED = 5600
     GEAR_RATIO = 49 * 84 / 50
@@ -47,23 +46,28 @@ class CargoManipulator:
 
     def setup(self) -> None:
         self.arm_motor.setIdleMode(rev.IdleMode.kBrake)
-        self.arm_motor.setSecondaryCurrentLimit(
-            60, limitCycles=200
-        )  # check limitCycles
+        # self.arm_motor.setSecondaryCurrentLimit(
+        #     60, limitCycles=200
+        # )  # check limitCycles
         self.arm_motor.setInverted(False)
 
         self.encoder = self.arm_motor.getEncoder()
         self.pid_controller = wpilib_controller.PIDController(
-            Kp=0.05,
+            Kp=0.3,
             Ki=0.0,
             Kd=0.0,
             measurement_source=self.encoder.getPosition,
             period=1 / 50,
         )
-        self.pid_controller.setInputRange(
-            Height.LOADING_STATION.value, Height.FLOOR.value
-        )
+        # self.pid_controller.setInputRange(
+        #     Height.LOADING_STATION.value, Height.FLOOR.value
+        # )
         self.pid_controller.setOutputRange(-1, 1)
+        # self.pid_controller = self.arm_motor.getPIDController()
+        # # self.pid_controller.setOutputRange(0, 0)
+        # self.pid_controller.setP(0.8)
+        # self.pid_controller.setI(0)
+        # self.pid_controller.setD(0)
 
         self.top_limit_switch = self.arm_motor.getReverseLimitSwitch(
             rev.LimitSwitchPolarity.kNormallyOpen
@@ -73,7 +77,9 @@ class CargoManipulator:
         )
 
         # Arm starts at max height to remain within frame perimeter
-        self.setpoint = Height.LOADING_STATION.value
+        # self.last_setpoint = None
+        # self.setpoint = Height.LOADING_STATION.value
+        self.setpoint = 0
         self.tolerance = 0
 
         self.ratchet_engaged = True
@@ -88,10 +94,12 @@ class CargoManipulator:
             "bottom_switch", self.bottom_limit_switch.get()
         )
         wpilib.SmartDashboard.putNumber("cargo_setpoint", self.setpoint)
-        wpilib.SmartDashboard.putNumber(
-            "cargo_setpoint_counts", self.counts_per_rad(self.setpoint)
-        )
+        # wpilib.SmartDashboard.putNumber(
+        #     "cargo_setpoint_counts", self.counts_per_rad(self.setpoint)
+        # )
         wpilib.SmartDashboard.putBoolean("intake_switch", self.intake_switch.get())
+        wpilib.SmartDashboard.putNumber("arm_encoder", self.encoder.getPosition())
+        wpilib.SmartDashboard.putNumber("arm_output", self.arm_motor.getAppliedOutput())
 
         self.intake_motor.set(ctre.ControlMode.PercentOutput, self.intake_motor_output)
 
@@ -100,8 +108,8 @@ class CargoManipulator:
         self.pid_controller.setReference(self.setpoint)
         output = self.pid_controller.update()
         self.arm_motor.set(output)
+        wpilib.SmartDashboard.putNumber("pid_output", output)
         # else:
-        #     self.pid_controller.setReference(self.counts_per_rad(self.setpoint.value), rev.ControlType.kPosition, pidSlot=0)
         if self.ratchet_engaged:
             self.intake_servo.setAngle(self.RATCHET_ANGLE)
         else:
@@ -109,6 +117,13 @@ class CargoManipulator:
 
         if self.is_contained():
             self.has_cargo = True
+
+        if self.top_limit_switch.get():
+            self.encoder.setPosition(0.0)
+
+        # if self.last_setpoint != self.setpoint:
+        #     self.pid_controller.setReference(self.setpoint, rev.ControlType.kPosition)
+        #     self.last_setpoint = self.setpoint
 
     def at_height(self, desired_height) -> bool:
         return (
@@ -137,9 +152,11 @@ class CargoManipulator:
     def on_disable(self):
         self.intake_motor.set(ctre.ControlMode.PercentOutput, 0)
         self.arm_motor.set(0)
+        self.intake_servo.setAngle(0)
     
     def on_enable(self):
         self.setpoint = self.encoder.getPosition()
+        self.intake_servo.setAngle(0)
 
     def intake(self) -> None:
         self.intake_motor_output = self.INTAKE_SPEED
