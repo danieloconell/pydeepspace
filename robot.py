@@ -109,6 +109,7 @@ class Robot(magicbot.MagicRobot):
         self.hatch_bottom_puncher = wpilib.Solenoid(0)
         self.hatch_left_puncher = wpilib.Solenoid(1)
         self.hatch_right_puncher = wpilib.Solenoid(2)
+        self.release_piston = wpilib.DoubleSolenoid(forwardChannel=6, reverseChannel=2)
 
         self.hatch_left_limit_switch = wpilib.DigitalInput(8)
         self.hatch_right_limit_switch = wpilib.DigitalInput(9)

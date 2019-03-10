@@ -12,6 +12,7 @@ class Hatch:
     hatch_bottom_puncher: wpilib.Solenoid
     hatch_left_puncher: wpilib.Solenoid
     hatch_right_puncher: wpilib.Solenoid
+    release_piston: wpilib.DoubleSolenoid
 
     left_limit_switch: wpilib.DigitalInput
     right_limit_switch: wpilib.DigitalInput
@@ -21,9 +22,11 @@ class Hatch:
 
     def on_enable(self):
         self._punch_on = False
+        self._release = False
         self.clear_to_retract = False
         self.fired_position = 0, 0
         self.loop_counter = 0
+        self.fire_align_piston()
 
     def execute(self):
         """Run at the end of every control loop iteration."""
@@ -53,6 +56,9 @@ class Hatch:
         self.clear_to_retract = False
         self.fired_position = self.chassis.position
 
+    def release(self):
+        self._release = True
+
     def _retract(self):
         self._punch_on = False
         self.clear_to_retract = False
@@ -61,3 +67,12 @@ class Hatch:
         return any(
             [not self.left_limit_switch.get(), not self.right_limit_switch.get()]
         )
+
+    def on_disable(self):
+        self.retract_align_piston()
+
+    def fire_align_piston(self):
+        self.release_piston.set(self.release_piston.Value.kForward)
+
+    def retract_align_piston(self):
+        self.release_piston.set(self.release_piston.Value.kReverse)
